@@ -1,4 +1,5 @@
-web
+web programlama
 ===
 
-web programlama dersi kodlarım burada yer alacak
+web programlama dersi kodlarim burada yer alacak.
+
