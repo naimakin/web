@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Note Platform</title>
+  <link href="/vendor/quill/quill.snow.css" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f0f0f;--surface:#161616;--surface2:#1e1e1e;--border:#2c2c2c;
+      --accent:#4f8ef7;--accent-dim:rgba(79,142,247,0.12);
+      --text:#e2e2e2;--muted:#666;--danger:#e05252;--success:#4caf7d;--warn:#e0a050;
+    }
+    html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+
+    /* HEADER */
+    header{position:fixed;top:0;left:0;right:0;height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;z-index:200}
+    .logo{font-weight:700;font-size:1rem;color:var(--accent)}
+    .logo span{color:var(--muted);font-weight:400}
+    .user-badge{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 12px 4px 8px;cursor:pointer;transition:border-color .15s;position:relative}
+    .user-badge:hover{border-color:var(--accent)}
+    .user-avatar{width:24px;height:24px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:#fff}
+    .user-name{font-size:.8rem}
+    .user-group{font-size:.7rem;color:var(--muted)}
+    .user-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px;min-width:160px;display:none;z-index:300}
+    .user-badge:focus-within .user-dropdown,.user-badge.open .user-dropdown{display:block}
+    .dd-item{padding:8px 12px;border-radius:5px;font-size:.82rem;cursor:pointer;color:var(--text);transition:background .12s;white-space:nowrap}
+    .dd-item:hover{background:rgba(255,255,255,.05)}
+    .dd-item.danger{color:var(--danger)}
+
+    /* LAYOUT */
+    .app{display:flex;height:100vh;padding-top:48px}
+
+    /* SIDEBAR */
+    .sidebar{width:260px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+    .sidebar-header{padding:10px 12px;border-bottom:1px solid var(--border)}
+    .search-box{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:.82rem;font-family:inherit;outline:none;transition:border-color .15s}
+    .search-box:focus{border-color:var(--accent)}
+    .search-box::placeholder{color:var(--muted)}
+    .sidebar-actions{padding:8px 10px;display:flex;gap:6px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .btn{padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:.78rem;transition:all .15s;font-family:inherit}
+    .btn:hover{background:var(--surface2);color:var(--text)}
+    .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .btn-primary:hover{background:#3a7ae0}
+    .btn-danger:hover{border-color:var(--danger);color:var(--danger)}
+    .btn-new{flex:1;padding:7px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-size:.8rem;font-family:inherit;transition:all .15s}
+    .btn-new:hover{background:var(--accent);color:#fff}
+    .btn-sm{padding:3px 8px;font-size:.72rem}
+
+    /* GROUP TABS */
+    .group-tabs{display:flex;gap:4px;padding:8px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .group-tab{padding:3px 8px;border-radius:4px;font-size:.72rem;cursor:pointer;border:1px solid transparent;transition:all .15s;color:var(--muted);background:transparent;font-family:inherit}
+    .group-tab:hover{background:var(--surface2);color:var(--text)}
+    .group-tab.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+    .group-tab.admin-tab{border-color:rgba(155,89,182,.4);color:#9b59b6}
+    .group-tab.admin-tab.active{background:rgba(155,89,182,.15)}
+
+    /* TREE (wiki-style) */
+    .notes-tree{flex:1;overflow-y:auto;padding:6px}
+    .tree-node{}
+    .tree-item{display:flex;align-items:center;padding:5px 8px;border-radius:5px;cursor:pointer;transition:background .12s;border-left:2px solid transparent;gap:4px;margin-bottom:1px}
+    .tree-item:hover{background:rgba(255,255,255,.03)}
+    .tree-item.active{background:var(--accent-dim);border-left-color:var(--accent)}
+    .tree-toggle{width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:.65rem;color:var(--muted);cursor:pointer;flex-shrink:0;border-radius:3px;transition:all .15s}
+    .tree-toggle:hover{background:rgba(255,255,255,.08);color:var(--text)}
+    .tree-icon{font-size:.75rem;flex-shrink:0;opacity:.7}
+    .tree-title{font-size:.82rem;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+    .tree-meta{font-size:.65rem;color:var(--muted);flex-shrink:0}
+    .tree-children{padding-left:18px}
+    .tree-children.collapsed{display:none}
+    .tree-add-child{display:none;width:14px;height:14px;font-size:.7rem;color:var(--muted);cursor:pointer;align-items:center;justify-content:center;border-radius:3px}
+    .tree-item:hover .tree-add-child{display:flex}
+    .tree-add-child:hover{color:var(--accent);background:rgba(79,142,247,.1)}
+    .no-notes{padding:20px;text-align:center;color:var(--muted);font-size:.82rem}
+
+    /* EDITOR */
+    .editor-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted)}
+    .empty-icon{font-size:2.5rem;opacity:.15}
+    .empty-text{font-size:.9rem;opacity:.4}
+    .note-meta-bar{display:flex;align-items:center;gap:8px;padding:6px 20px;border-bottom:1px solid var(--border);background:var(--surface);font-size:.75rem;color:var(--muted);flex-wrap:wrap}
+    .note-owner-badge{padding:2px 8px;border-radius:4px;background:var(--accent-dim);color:var(--accent);font-size:.7rem}
+    .note-shared-badge{padding:2px 8px;border-radius:4px;background:rgba(224,160,80,.15);color:var(--warn);font-size:.7rem}
+    .breadcrumb{display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--muted);flex:1;flex-wrap:wrap}
+    .breadcrumb-item{cursor:pointer;transition:color .12s}
+    .breadcrumb-item:hover{color:var(--accent)}
+    .breadcrumb-sep{opacity:.4}
+    .note-title-input{background:transparent;border:none;outline:none;color:var(--text);font-size:1.5rem;font-weight:700;padding:16px 20px 10px;width:100%;border-bottom:1px solid var(--border);font-family:inherit}
+    .note-title-input::placeholder{color:var(--muted)}
+
+    /* QUILL overrides */
+    #editorWrapper{flex:1;overflow:hidden;display:flex;flex-direction:column}
+    .ql-toolbar.ql-snow{background:var(--surface);border:none;border-bottom:1px solid var(--border);padding:6px 12px;flex-shrink:0}
+    .ql-container.ql-snow{border:none;flex:1;overflow:hidden}
+    .ql-editor{height:100%;overflow-y:auto;color:var(--text);font-size:.93rem;line-height:1.75;padding:20px 24px;background:var(--bg)}
+    .ql-editor.ql-blank::before{color:var(--muted);font-style:normal}
+    .ql-snow .ql-stroke{stroke:var(--muted)}
+    .ql-snow .ql-fill{fill:var(--muted)}
+    .ql-snow .ql-picker{color:var(--muted)}
+    .ql-snow .ql-picker-options{background:var(--surface2);border-color:var(--border)}
+    .ql-toolbar button:hover .ql-stroke,.ql-toolbar button.ql-active .ql-stroke{stroke:var(--accent)}
+    .ql-toolbar button:hover .ql-fill,.ql-toolbar button.ql-active .ql-fill{fill:var(--accent)}
+    .ql-snow .ql-picker-label:hover,.ql-snow .ql-picker-label.ql-active{color:var(--accent)}
+    .ql-editor h1,.ql-editor h2,.ql-editor h3{color:var(--text)}
+    .ql-editor a{color:var(--accent)}
+    .ql-editor pre.ql-syntax{background:#0a0a0a;border:1px solid var(--border);color:#7dd3fc;border-radius:6px;padding:12px 16px}
+    .ql-editor blockquote{border-left:3px solid var(--accent);padding-left:14px;color:var(--muted)}
+    .save-status-bar{display:flex;align-items:center;gap:6px;padding:3px 20px;background:var(--surface);border-top:1px solid var(--border);font-size:.72rem;color:var(--muted)}
+    .save-dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+    .save-dot.saved{background:var(--success)}
+    .save-dot.saving{background:var(--accent);animation:blink 1s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+    /* DRAWIO OVERLAY — tam ekran, not üzerinde */
+    .drawio-overlay{position:fixed;inset:48px 0 0 0;z-index:250;display:none;flex-direction:column;background:var(--bg)}
+    .drawio-overlay.open{display:flex}
+    .drawio-overlay-header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+    .drawio-overlay-header h3{font-size:.9rem;color:var(--text)}
+    .drawio-overlay iframe{flex:1;border:none;width:100%}
+
+    /* MODALS */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center}
+    .modal-overlay.open{display:flex}
+    .modal{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:24px;width:440px;max-width:92vw}
+    .modal h3{font-size:1rem;margin-bottom:16px}
+    .modal-label{font-size:.78rem;color:var(--muted);margin-bottom:6px;margin-top:10px}
+    .modal-select{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-size:.85rem;font-family:inherit;outline:none;margin-bottom:4px}
+    .modal-select:focus{border-color:var(--accent)}
+    .modal-radio-group{display:flex;gap:12px;margin-bottom:12px}
+    .modal-radio{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.82rem;color:var(--muted)}
+    .modal-radio input{accent-color:var(--accent)}
+    .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+    .admin-badge{background:rgba(155,89,182,.2);color:#9b59b6;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600}
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+    #noteEditor{display:none;flex-direction:column;flex:1;overflow:hidden}
+    #noteEditor.visible{display:flex}
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">✦ Note <span>Platform</span></div>
+  <div id="headerCenter"></div>
+  <div class="user-badge" id="userBadge" tabindex="0" onclick="toggleDD()">
+    <div class="user-avatar" id="userAvatar">?</div>
+    <div>
+      <div class="user-name" id="userName">Yükleniyor...</div>
+      <div class="user-group" id="userGroupLabel"></div>
+    </div>
+    <div class="user-dropdown" id="userDropdown">
+      <div class="dd-item" onclick="openImportExport()">⇅ Import / Export</div>
+      <div class="dd-item danger" onclick="doLogout()">⎋ Çıkış Yap</div>
+    </div>
+  </div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <input class="search-box" type="text" id="searchBox" placeholder="Not ara..." oninput="onSearch()"/>
+    </div>
+    <div class="sidebar-actions">
+      <button class="btn-new" onclick="newNote()">+ Yeni Not</button>
+      <button class="btn btn-sm" onclick="openImportExport()" title="Import/Export">⇅</button>
+    </div>
+    <div class="group-tabs" id="groupTabs"></div>
+    <div class="notes-tree" id="notesTree"></div>
+  </aside>
+
+  <div class="editor-area">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">✦</div>
+      <div class="empty-text">Bir not seçin veya yeni not oluşturun</div>
+    </div>
+
+    <div id="noteEditor">
+      <div class="note-meta-bar">
+        <div class="breadcrumb" id="breadcrumb"></div>
+        <span id="noteOwnerBadge" class="note-owner-badge"></span>
+        <span id="noteSharedBadge" class="note-shared-badge" style="display:none"></span>
+        <span id="noteReadonly" style="color:var(--warn);display:none;font-size:.75rem">👁 Salt okunur</span>
+        <button class="btn btn-sm" id="publishBtn" onclick="openPublishModal()" style="display:none">📤 Gruba Yayınla</button>
+        <button class="btn btn-sm" id="unpublishBtn" onclick="unpublishNote()" style="display:none" title="Gruptan geri al, kişisel yap">🔒 Kişisel Yap</button>
+        <button class="btn btn-sm" id="shareBtn" onclick="openShareModal()" style="display:none">↗ Gruplar Arası Paylaş</button>
+        <button class="btn btn-sm" id="addDiagramBtn" onclick="addDrawioEmbed()" title="Topoloji diyagramı ekle" style="display:none">⬡ Diyagram Ekle</button>
+        <button class="btn btn-sm btn-danger" id="deleteBtn" onclick="deleteNote()" style="display:none">🗑 Sil</button>
+      </div>
+      <input type="text" class="note-title-input" id="noteTitleInput" placeholder="Not başlığı..." oninput="scheduleSave()"/>
+      <div id="editorWrapper">
+        <!-- Quill buraya mount edilecek -->
+        <div id="quillEditor"></div>
+      </div>
+      <div class="save-status-bar">
+        <div class="save-dot" id="saveDot"></div>
+        <span id="saveText">—</span>
+        <span style="margin-left:auto;font-size:.7rem;color:var(--muted)" id="noteInfo"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gruba Yayınla Modalı -->
+<div class="modal-overlay" id="publishModal">
+  <div class="modal" style="width:360px">
+    <h3>📤 Gruba Yayınla</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">Bu notu seçeceğiniz grubun tüm üyeleri görebilir.</p>
+    <div class="modal-label">Hangi gruba yayınlansın?</div>
+    <select class="modal-select" id="publishGroup"></select>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('publishModal')">İptal</button>
+      <button class="btn btn-primary" onclick="confirmPublish()">Yayınla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Draw.io Overlay -->
+<div class="drawio-overlay" id="drawioOverlay">
+  <div class="drawio-overlay-header">
+    <h3>⬡ Topoloji Diyagramı</h3>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-size:.75rem;color:var(--muted)">Diyagramı tamamlayın, ardından nota ekleyin</span>
+      <button class="btn btn-primary btn-sm" onclick="saveDrawioToNote()">📋 Nota Ekle (PNG)</button>
+      <button class="btn btn-sm" onclick="closeDrawioOverlay()">✕ Kapat</button>
+    </div>
+  </div>
+  <iframe id="drawioFrame" src="" style="flex:1;border:none;width:100%"></iframe>
+</div>
+
+<!-- Share Modal -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal">
+    <h3>↗ Notu Paylaş</h3>
+    <div class="modal-label">Hangi grupla paylaşılsın?</div>
+    <select class="modal-select" id="shareTargetGroup"></select>
+    <div class="modal-label">Yetki</div>
+    <div class="modal-radio-group">
+      <label class="modal-radio"><input type="radio" name="sharePerm" value="read" checked/> Sadece oku</label>
+      <label class="modal-radio"><input type="radio" name="sharePerm" value="write"/> Düzenleyebilsin</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('shareModal')">İptal</button>
+      <button class="btn btn-primary" onclick="confirmShare()">Paylaş</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import/Export Modal -->
+<div class="modal-overlay" id="importExportModal">
+  <div class="modal" style="width:500px">
+    <h3>⇅ Import / Export</h3>
+    <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+      <button class="btn btn-primary" id="tabImpBtn" onclick="ieTab('import')">← Import</button>
+      <button class="btn" id="tabExpBtn" onclick="ieTab('export')">→ Export</button>
+    </div>
+    <div id="ieImp">
+      <div class="modal-label">XWiki XAR dosyası (.xar)</div>
+      <input type="file" id="xarFile" accept=".xar,.zip" style="color:var(--text);font-size:.82rem;width:100%;margin-bottom:8px"/>
+      <div class="modal-label">Hangi gruba aktarılsın?</div>
+      <select class="modal-select" id="impGroup"></select>
+      <div class="modal-label">Başlık öneki (isteğe bağlı)</div>
+      <input type="text" class="modal-select" id="impPrefix" placeholder="örn: [XWiki] "/>
+      <div id="impStatus" style="font-size:.8rem;min-height:20px;margin-top:10px"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('importExportModal')">İptal</button>
+        <button class="btn btn-primary" onclick="doImport()">İçe Aktar</button>
+      </div>
+    </div>
+    <div id="ieExp" style="display:none">
+      <div class="modal-label">Kapsam</div>
+      <select class="modal-select" id="expScope" onchange="toggleExpGroup()">
+        <option value="note">Aktif not</option>
+        <option value="group">Tüm grup (ZIP)</option>
+      </select>
+      <div id="expGroupWrap" style="display:none">
+        <div class="modal-label">Grup</div>
+        <select class="modal-select" id="expGroup"></select>
+      </div>
+      <div class="modal-label">Format</div>
+      <div class="modal-radio-group">
+        <label class="modal-radio"><input type="radio" name="expFmt" value="html" checked/> HTML</label>
+        <label class="modal-radio"><input type="radio" name="expFmt" value="md"/> Markdown</label>
+        <label class="modal-radio"><input type="radio" name="expFmt" value="json"/> JSON</label>
+      </div>
+      <div id="expStatus" style="font-size:.8rem;min-height:20px;margin-top:10px"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('importExportModal')">İptal</button>
+        <button class="btn btn-primary" onclick="doExport()">Dışa Aktar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quill CDN (yerel Nexus cache'inden) -->
+<script src="/vendor/quill/quill.min.js"></script>
+<script>
+// ── STATE ─────────────────────────────────────────────────
+let KNOWN_GROUPS = {}, ADMIN_GROUP = 'BTAOM_YONETICILER';
+let currentUser = null, userGroups = [], isAdmin = false, isSuperAdmin = false;
+let notes = [], activeId = null, activeNote = null;
+let saveTimer = null, currentFilter = 'personal', searchQ = '';
+let quill = null;
+let treeCollapsed = {};
+
+// ── INIT ──────────────────────────────────────────────────
+async function init() {
+  // Quill init
+  quill = new Quill('#quillEditor', {
+    theme: 'snow',
+    placeholder: 'Yazmaya başlayın...',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ color: [] }, { background: [] }],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['blockquote', 'code-block'],
+        ['link', 'image'],
+        ['clean']
+      ]
+    }
+  });
+
+  // Quill resim handler — base64 olarak inline göm
+  quill.getModule('toolbar').addHandler('image', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const range = quill.getSelection(true);
+        quill.insertEmbed(range.index, 'image', ev.target.result);
+        quill.setSelection(range.index + 1);
+        scheduleSave();
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  });
+
+  quill.on('text-change', scheduleSave);
+
+  try {
+    const [meRes, grRes] = await Promise.all([fetch('/api/me'), fetch('/api/groups')]);
+    if (!meRes.ok) { location.href = '/login'; return; }
+    currentUser = await meRes.json();
+    if (grRes.ok) { const g = await grRes.json(); KNOWN_GROUPS = g.groups || {}; ADMIN_GROUP = g.adminGroup || ADMIN_GROUP; }
+
+    userGroups   = (currentUser.groups || []).filter(g => KNOWN_GROUPS[g]);
+    isAdmin      = !!(currentUser.groups || []).includes(ADMIN_GROUP);
+    isSuperAdmin = !!currentUser.isSuperAdmin;
+
+    document.getElementById('userName').textContent     = currentUser.name;
+    document.getElementById('userAvatar').textContent   = (currentUser.name || '?')[0].toUpperCase();
+    document.getElementById('userGroupLabel').textContent = isAdmin ? 'Yönetici' : (userGroups.map(g=>KNOWN_GROUPS[g]).join(', ') || '—');
+    if (isAdmin || isSuperAdmin) {
+      const b = document.createElement('span');
+      b.className = 'admin-badge'; b.textContent = '★ Admin';
+      document.getElementById('headerCenter').appendChild(b);
+    }
+    renderTabs();
+    await loadNotes();
+  } catch(e) { console.error(e); location.href = '/login'; }
+}
+
+function toggleDD() {
+  document.getElementById('userBadge').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if (!document.getElementById('userBadge').contains(e.target))
+    document.getElementById('userBadge').classList.remove('open');
+});
+
+function doLogout() { location.href = '/logout'; }
+
+// ── TABS ─────────────────────────────────────────────────
+function renderTabs() {
+  const tabs = document.getElementById('groupTabs');
+  tabs.innerHTML = '';
+  const add = (key, label, cls='') => {
+    const b = document.createElement('button');
+    b.className = `group-tab ${cls} ${currentFilter === key ? 'active' : ''}`;
+    b.textContent = label;
+    b.onclick = () => { currentFilter = key; renderTabs(); loadNotes(); };
+    tabs.appendChild(b);
+  };
+  add('personal', '🔒 Kişisel');
+  add('group',    '👥 Grup Notları');
+  add('shared',   '↗ Paylaşılanlar');
+  if (isAdmin || isSuperAdmin)
+    Object.entries(KNOWN_GROUPS).forEach(([k,l]) => { if (k !== ADMIN_GROUP) add(k, l, 'admin-tab'); });
+}
+
+// ── LOAD ─────────────────────────────────────────────────
+async function loadNotes() {
+  try {
+    const p = new URLSearchParams();
+    if (['personal','group','shared'].includes(currentFilter)) {
+      p.set('filter', currentFilter);
+    } else {
+      p.set('group', currentFilter); // admin sekme
+    }
+    if (searchQ) p.set('q', searchQ);
+    const res = await fetch(`/api/notes?${p}`);
+    notes = res.ok ? await res.json() : [];
+    renderTree();
+  } catch(e) { console.error(e); }
+}
+
+// ── TREE ─────────────────────────────────────────────────
+function buildTree(noteList) {
+  const map = {}, roots = [];
+  noteList.forEach(n => { map[n.id] = { ...n, children: [] }; });
+  noteList.forEach(n => {
+    if (n.parent_id && map[n.parent_id]) map[n.parent_id].children.push(map[n.id]);
+    else roots.push(map[n.id]);
+  });
+  return roots;
+}
+
+function renderTree() {
+  const container = document.getElementById('notesTree');
+  const tree = buildTree(notes);
+  if (tree.length === 0) { container.innerHTML = '<div class="no-notes">Not bulunamadı</div>'; return; }
+  container.innerHTML = '';
+  tree.forEach(node => container.appendChild(renderNode(node, 0)));
+}
+
+function renderNode(node, depth) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tree-node';
+
+  const hasChildren = node.children && node.children.length > 0;
+  const isCollapsed = treeCollapsed[node.id];
+
+  const item = document.createElement('div');
+  item.className = 'tree-item' + (node.id === activeId ? ' active' : '');
+  item.dataset.id = node.id;
+
+  const toggle = document.createElement('span');
+  toggle.className = 'tree-toggle';
+  if (hasChildren) {
+    toggle.textContent = isCollapsed ? '▶' : '▼';
+    toggle.onclick = (e) => { e.stopPropagation(); treeCollapsed[node.id] = !treeCollapsed[node.id]; renderTree(); };
+  }
+
+  const icon   = document.createElement('span');
+  icon.className = 'tree-icon';
+  icon.textContent = hasChildren ? '📁' : '📄';
+
+  const title  = document.createElement('span');
+  title.className = 'tree-title';
+  title.textContent = node.title || 'Başlıksız';
+
+  const meta   = document.createElement('span');
+  meta.className = 'tree-meta';
+  meta.textContent = fmtDate(node.updated_at);
+
+  const addBtn = document.createElement('span');
+  addBtn.className = 'tree-add-child';
+  addBtn.title = 'Alt not ekle';
+  addBtn.textContent = '+';
+  addBtn.onclick = (e) => { e.stopPropagation(); newNote(node.id); };
+
+  item.appendChild(toggle);
+  item.appendChild(icon);
+  item.appendChild(title);
+  item.appendChild(meta);
+  item.appendChild(addBtn);
+  item.onclick = () => openNote(node.id);
+  wrap.appendChild(item);
+
+  if (hasChildren) {
+    const childWrap = document.createElement('div');
+    childWrap.className = 'tree-children' + (isCollapsed ? ' collapsed' : '');
+    node.children.forEach(child => childWrap.appendChild(renderNode(child, depth + 1)));
+    wrap.appendChild(childWrap);
+  }
+  return wrap;
+}
+
+// ── BREADCRUMB ────────────────────────────────────────────
+function getBreadcrumb(noteId) {
+  const path = [];
+  let cur = notes.find(n => n.id === noteId);
+  while (cur) {
+    path.unshift(cur);
+    cur = cur.parent_id ? notes.find(n => n.id === cur.parent_id) : null;
+  }
+  return path;
+}
+
+function renderBreadcrumb(noteId) {
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = '';
+  const path = getBreadcrumb(noteId);
+  const groupLabel = activeNote ? (KNOWN_GROUPS[activeNote.owner_group] || activeNote.owner_group || '') : '';
+  if (groupLabel) {
+    const g = document.createElement('span');
+    g.className = 'breadcrumb-item';
+    g.textContent = groupLabel;
+    g.onclick = () => { currentFilter = activeNote.owner_group; renderTabs(); loadNotes(); };
+    bc.appendChild(g);
+  }
+  path.forEach((n, i) => {
+    if (i > 0 || groupLabel) {
+      const sep = document.createElement('span');
+      sep.className = 'breadcrumb-sep'; sep.textContent = ' › ';
+      bc.appendChild(sep);
+    }
+    const s = document.createElement('span');
+    s.className = 'breadcrumb-item';
+    s.textContent = n.title || 'Başlıksız';
+    if (i < path.length - 1) s.onclick = () => openNote(n.id);
+    bc.appendChild(s);
+  });
+}
+
+// ── OPEN NOTE ─────────────────────────────────────────────
+async function openNote(id) {
+  if (activeId && activeId !== id) await saveNote(true);
+  activeId = id;
+  activeNote = notes.find(n => n.id === id);
+  if (!activeNote) return;
+
+  document.getElementById('emptyState').style.display  = 'none';
+  document.getElementById('noteEditor').classList.add('visible');
+  document.getElementById('noteTitleInput').value = activeNote.title || '';
+
+  // Quill içeriğini yükle
+  quill.root.innerHTML = activeNote.content || '';
+  quill.history.clear();
+
+  // Meta badge
+  const ownerBadge = document.getElementById('noteOwnerBadge');
+  if (activeNote.owner_group) {
+    ownerBadge.textContent = '👥 ' + (KNOWN_GROUPS[activeNote.owner_group] || activeNote.owner_group);
+    ownerBadge.style.background = 'var(--accent-dim)';
+    ownerBadge.style.color = 'var(--accent)';
+  } else {
+    ownerBadge.textContent = '🔒 Kişisel';
+    ownerBadge.style.background = 'rgba(76,175,125,0.1)';
+    ownerBadge.style.color = 'var(--success)';
+  }
+  const sb = document.getElementById('noteSharedBadge');
+  if (activeNote.shared_to) { sb.textContent = `↗ ${KNOWN_GROUPS[activeNote.shared_to]||activeNote.shared_to}`; sb.style.display=''; }
+  else sb.style.display = 'none';
+
+  document.getElementById('noteInfo').textContent = `Son güncelleme: ${fmtDate(activeNote.updated_at)}`;
+  renderBreadcrumb(id);
+
+  // Yetki
+  const isOwner  = activeNote.created_by === currentUser.email || isAdmin || isSuperAdmin;
+  const isGroupMember = activeNote.owner_group && (userGroups.includes(activeNote.owner_group) || isAdmin || isSuperAdmin);
+  const canEdit  = isOwner || isGroupMember || activeNote.share_permission === 'write';
+  const isPublished = !!activeNote.owner_group;
+
+  quill.enable(canEdit);
+  document.getElementById('noteTitleInput').readOnly    = !canEdit;
+  document.getElementById('noteReadonly').style.display = canEdit ? 'none' : '';
+
+  // Butonlar
+  document.getElementById('publishBtn').style.display   = (isOwner && !isPublished) ? '' : 'none';
+  document.getElementById('unpublishBtn').style.display = (isOwner && isPublished) ? '' : 'none';
+  document.getElementById('shareBtn').style.display     = (isPublished && isGroupMember) ? '' : 'none';
+  document.getElementById('deleteBtn').style.display    = isOwner ? '' : 'none';
+  document.getElementById('addDiagramBtn').style.display = canEdit ? '' : 'none';
+
+  renderTree();
+  setSave('saved');
+}
+
+// ── NEW NOTE ──────────────────────────────────────────────
+let pendingParentId = null;
+
+async function newNote(parentId = null) {
+  await createNote('Yeni Not', parentId);
+}
+
+async function createNote(title, parentId) {
+  try {
+    const res = await fetch('/api/notes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content: '', parent_id: parentId }),
+    });
+    const note = await res.json();
+    notes.unshift(note);
+    // Kişisel sekmeye geç
+    if (currentFilter !== 'personal') { currentFilter = 'personal'; renderTabs(); }
+    renderTree();
+    openNote(note.id);
+    setTimeout(() => document.getElementById('noteTitleInput').select(), 100);
+  } catch(e) { console.error(e); }
+}
+
+// ── SAVE ──────────────────────────────────────────────────
+function scheduleSave() {
+  setSave('saving');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNote, 1800);
+}
+
+async function saveNote(silent = false) {
+  if (!activeId || !activeNote) return;
+  const isOwner      = activeNote.created_by === currentUser.email || isAdmin || isSuperAdmin;
+  const isGroupMember= activeNote.owner_group && (userGroups.includes(activeNote.owner_group) || isAdmin || isSuperAdmin);
+  const canEdit      = isOwner || isGroupMember || activeNote.share_permission === 'write';
+  if (!canEdit) return;
+
+  const title   = document.getElementById('noteTitleInput').value || 'Başlıksız Not';
+  const content = quill.root.innerHTML;
+
+  try {
+    const res = await fetch(`/api/notes/${activeId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      const idx = notes.findIndex(n => n.id === activeId);
+      if (idx >= 0) notes[idx] = updated;
+      activeNote = updated;
+      if (!silent) { renderTree(); setSave('saved'); }
+    }
+  } catch(e) { setSave('error'); }
+}
+
+// ── DELETE ────────────────────────────────────────────────
+async function deleteNote() {
+  if (!activeId || !confirm('Bu notu silmek istediğinizden emin misiniz?')) return;
+  await fetch(`/api/notes/${activeId}`, { method: 'DELETE' });
+  notes = notes.filter(n => n.id !== activeId);
+  activeId = null; activeNote = null;
+  document.getElementById('noteEditor').classList.remove('visible');
+  document.getElementById('emptyState').style.display = '';
+  renderTree();
+}
+
+// ── PUBLISH / UNPUBLISH ───────────────────────────────────
+function openPublishModal() {
+  const sel = document.getElementById('publishGroup');
+  sel.innerHTML = '';
+  const groups = (isAdmin || isSuperAdmin) ? Object.keys(KNOWN_GROUPS) : userGroups;
+  groups.forEach(g => sel.innerHTML += `<option value="${g}">${KNOWN_GROUPS[g]||g}</option>`);
+  openModal('publishModal');
+}
+
+async function confirmPublish() {
+  const group = document.getElementById('publishGroup').value;
+  closeModal('publishModal');
+  try {
+    const res = await fetch(`/api/notes/${activeId}/publish`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      const idx = notes.findIndex(n => n.id === activeId);
+      if (idx >= 0) notes[idx] = updated;
+      activeNote = updated;
+      // Grup notlarına geç
+      currentFilter = 'group';
+      renderTabs();
+      await loadNotes();
+      openNote(activeId);
+    } else {
+      const d = await res.json();
+      alert(d.error || 'Yayınlanamadı');
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function unpublishNote() {
+  if (!confirm('Bu notu gruptan geri alıp kişisel yapmak istiyor musunuz?')) return;
+  try {
+    const res = await fetch(`/api/notes/${activeId}/unpublish`, { method: 'POST' });
+    if (res.ok) {
+      const updated = await res.json();
+      const idx = notes.findIndex(n => n.id === activeId);
+      if (idx >= 0) notes[idx] = updated;
+      activeNote = updated;
+      currentFilter = 'personal';
+      renderTabs();
+      await loadNotes();
+      openNote(activeId);
+    }
+  } catch(e) { console.error(e); }
+}
+
+// ── SHARE ─────────────────────────────────────────────────
+function openShareModal() {
+  const sel = document.getElementById('shareTargetGroup');
+  sel.innerHTML = '';
+  Object.entries(KNOWN_GROUPS).forEach(([k,l]) => {
+    if (k !== (activeNote?.owner_group) && k !== ADMIN_GROUP) {
+      sel.innerHTML += `<option value="${k}">${l}</option>`;
+    }
+  });
+  openModal('shareModal');
+}
+
+async function confirmShare() {
+  const shared_to  = document.getElementById('shareTargetGroup').value;
+  const permission = document.querySelector('input[name="sharePerm"]:checked').value;
+  const res = await fetch(`/api/notes/${activeId}/share`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ shared_to, permission }),
+  });
+  if (res.ok) { const u = await res.json(); const i=notes.findIndex(n=>n.id===activeId); if(i>=0) notes[i]=u; activeNote=u; openNote(activeId); }
+  closeModal('shareModal');
+}
+
+// ── DRAW.IO OVERLAY ───────────────────────────────────────
+function addDrawioEmbed() {
+  const frame = document.getElementById('drawioFrame');
+  frame.src = '/drawio/index.html';
+  document.getElementById('drawioOverlay').classList.add('open');
+  window.addEventListener('message', onDrawioMsg);
+}
+
+function closeDrawioOverlay() {
+  document.getElementById('drawioOverlay').classList.remove('open');
+  document.getElementById('drawioFrame').src = '';
+  window.removeEventListener('message', onDrawioMsg);
+}
+
+function saveDrawioToNote() {
+  const frame = document.getElementById('drawioFrame');
+  if (!frame.contentWindow) return;
+  frame.contentWindow.postMessage(JSON.stringify({
+    action: 'export', format: 'png', spin: 'Aktarılıyor...'
+  }), '*');
+}
+
+function onDrawioMsg(evt) {
+  try {
+    const msg = typeof evt.data === 'string' ? JSON.parse(evt.data) : evt.data;
+    if (!msg || msg.event !== 'export' || !msg.data) return;
+
+    const imgSrc = msg.data.startsWith('data:') ? msg.data : `data:image/png;base64,${msg.data}`;
+
+    if (activeId) {
+      // Aktif notun sonuna img ekle
+      const range = quill.getLength();
+      quill.insertEmbed(range - 1, 'image', imgSrc);
+      quill.insertText(range, '\n');
+      scheduleSave();
+    } else {
+      // Yeni not olarak oluştur
+      const group = userGroups[0] || (isSuperAdmin ? Object.keys(KNOWN_GROUPS)[0] : '');
+      if (group) {
+        fetch('/api/notes', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'Topoloji Diyagramı', content: `<img src="${imgSrc}" style="max-width:100%"/>`, group }),
+        }).then(r => r.json()).then(note => {
+          notes.unshift(note); renderTree(); openNote(note.id);
+        });
+      }
+    }
+    closeDrawioOverlay();
+  } catch(_) {}
+}
+
+// ── IMPORT / EXPORT ───────────────────────────────────────
+function openImportExport() {
+  const groups = (isAdmin || isSuperAdmin) ? Object.keys(KNOWN_GROUPS) : userGroups;
+  ['impGroup','expGroup'].forEach(id => {
+    const s = document.getElementById(id); s.innerHTML = '';
+    groups.forEach(g => s.innerHTML += `<option value="${g}">${KNOWN_GROUPS[g]||g}</option>`);
+  });
+  ieTab('import');
+  openModal('importExportModal');
+  document.getElementById('userBadge').classList.remove('open');
+}
+function ieTab(t) {
+  document.getElementById('ieImp').style.display  = t==='import' ? '' : 'none';
+  document.getElementById('ieExp').style.display  = t==='export' ? '' : 'none';
+  document.getElementById('tabImpBtn').className  = t==='import' ? 'btn btn-primary' : 'btn';
+  document.getElementById('tabExpBtn').className  = t==='export' ? 'btn btn-primary' : 'btn';
+}
+function toggleExpGroup() {
+  const show = document.getElementById('expScope').value === 'group';
+  document.getElementById('expGroupWrap').style.display = show ? '' : 'none';
+}
+async function doImport() {
+  const fileEl = document.getElementById('xarFile');
+  const status = document.getElementById('impStatus');
+  if (!fileEl.files.length) { status.style.color='var(--danger)'; status.textContent='Dosya seçin.'; return; }
+  status.style.color='var(--muted)'; status.textContent='⏳ İçe aktarılıyor...';
+  const fd = new FormData();
+  fd.append('file', fileEl.files[0]);
+  fd.append('target_group', document.getElementById('impGroup').value);
+  const prefix = document.getElementById('impPrefix').value;
+  if (prefix) fd.append('title_prefix', prefix);
+  try {
+    const res = await fetch('/api/import/xar', { method:'POST', body: fd });
+    const d = await res.json();
+    if (res.ok) { status.style.color='var(--success)'; status.textContent=`✓ ${d.message}`; loadNotes(); }
+    else         { status.style.color='var(--danger)';  status.textContent=`✗ ${d.error}`; }
+  } catch(e) { status.style.color='var(--danger)'; status.textContent=`✗ Hata: ${e.message}`; }
+}
+function doExport() {
+  const scope  = document.getElementById('expScope').value;
+  const format = document.querySelector('input[name="expFmt"]:checked').value;
+  const status = document.getElementById('expStatus');
+  if (scope === 'note') {
+    if (!activeId) { status.style.color='var(--danger)'; status.textContent='Önce not seçin.'; return; }
+    window.location.href = `/api/export/note/${activeId}?format=${format}`;
+  } else {
+    const g = document.getElementById('expGroup').value;
+    window.location.href = `/api/export/group/${encodeURIComponent(g)}?format=${format}`;
+  }
+  status.style.color='var(--success)'; status.textContent='✓ İndirme başladı.';
+}
+
+// ── SEARCH ────────────────────────────────────────────────
+function onSearch() { searchQ = document.getElementById('searchBox').value; loadNotes(); }
+
+// ── MODAL HELPERS ─────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── SAVE STATUS ───────────────────────────────────────────
+function setSave(s) {
+  document.getElementById('saveDot').className = 'save-dot ' + s;
+  document.getElementById('saveText').textContent = {saved:'kaydedildi', saving:'kaydediliyor...', error:'hata!'}[s]||'—';
+}
+
+// ── HELPERS ───────────────────────────────────────────────
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('tr-TR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+
+// Ctrl+S
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key==='s') { e.preventDefault(); saveNote(); }
+});
+
+init();
+</script>
+</body>
+</html>
